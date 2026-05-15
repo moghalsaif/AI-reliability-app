@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
@@ -21,6 +21,7 @@ import {
   Scatter,
   ZAxis,
 } from "recharts";
+import { api, Alert, ReliabilityMetrics } from "@/lib/api";
 
 const reliabilityData = Array.from({ length: 30 }, (_, i) => ({
   day: `Day ${i + 1}`,
@@ -39,16 +40,46 @@ const modelComparison = [
   { model: "Ministral-8B", success: 0.82, latency: 800, cost: 0.2, hallucination: 0.12 },
 ];
 
-const radarData = [
-  { metric: "Success Rate", current: 0.92, baseline: 0.88 },
-  { metric: "Low Hallucination", current: 0.95, baseline: 0.90 },
-  { metric: "Tool Accuracy", current: 0.89, baseline: 0.85 },
-  { metric: "Context Retention", current: 0.87, baseline: 0.82 },
-  { metric: "Low Latency", current: 0.78, baseline: 0.75 },
-  { metric: "Low Variance", current: 0.85, baseline: 0.80 },
-];
-
 export default function ReliabilityPage() {
+  const [metrics, setMetrics] = useState<ReliabilityMetrics | null>(null);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      api.getReliabilityMetrics().catch(() => null),
+      api.getAlerts(10).catch(() => null),
+    ])
+      .then(([metricsData, alertsData]) => {
+        if (metricsData?.metrics) setMetrics(metricsData.metrics);
+        if (alertsData?.alerts) setAlerts(alertsData.alerts);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch reliability data:", err);
+        setError("API unavailable — showing demo data");
+        setLoading(false);
+      });
+  }, []);
+
+  const radarData = [
+    { metric: "Success Rate", current: metrics?.avg_success_rate || 0.92, baseline: 0.88 },
+    { metric: "Low Hallucination", current: 1 - (metrics?.avg_hallucination_rate || 0.05), baseline: 0.90 },
+    { metric: "Tool Accuracy", current: metrics?.avg_tool_accuracy || 0.89, baseline: 0.85 },
+    { metric: "Context Retention", current: 0.87, baseline: 0.82 },
+    { metric: "Low Latency", current: metrics?.avg_latency_p95 ? Math.max(0, 1 - metrics.avg_latency_p95 / 5000) : 0.78, baseline: 0.75 },
+    { metric: "Low Variance", current: metrics?.avg_variance_score ? Math.max(0, 1 - metrics.avg_variance_score) : 0.85, baseline: 0.80 },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">Loading reliability data...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -56,15 +87,45 @@ export default function ReliabilityPage() {
         <p className="text-muted-foreground">
           Stability trends, variance analysis, failure hotspots, and cost drift.
         </p>
+        {error && (
+          <div className="mt-2 text-sm text-yellow-400 bg-yellow-400/10 px-3 py-2 rounded">
+            {error}
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-5 gap-4">
-        <ReliabilityCard label="Success Rate" value="92.4%" change="+3.2%" positive />
-        <ReliabilityCard label="Hallucination Rate" value="4.8%" change="-1.1%" positive />
-        <ReliabilityCard label="Variance Score" value="0.84" change="+0.05" positive />
-        <ReliabilityCard label="Latency P95" value="2.1s" change="-12%" positive />
-        <ReliabilityCard label="Cost/Run" value="$0.042" change="+5%" positive={false} />
+        <ReliabilityCard
+          label="Success Rate"
+          value={metrics?.avg_success_rate ? `${(metrics.avg_success_rate * 100).toFixed(1)}%` : "92.4%"}
+          change="+3.2%"
+          positive
+        />
+        <ReliabilityCard
+          label="Hallucination Rate"
+          value={metrics?.avg_hallucination_rate ? `${(metrics.avg_hallucination_rate * 100).toFixed(1)}%` : "4.8%"}
+          change="-1.1%"
+          positive
+        />
+        <ReliabilityCard
+          label="Variance Score"
+          value={metrics?.avg_variance_score ? metrics.avg_variance_score.toFixed(2) : "0.84"}
+          change="+0.05"
+          positive
+        />
+        <ReliabilityCard
+          label="Latency P95"
+          value={metrics?.avg_latency_p95 ? `${(metrics.avg_latency_p95 / 1000).toFixed(1)}s` : "2.1s"}
+          change="-12%"
+          positive
+        />
+        <ReliabilityCard
+          label="Tool Accuracy"
+          value={metrics?.avg_tool_accuracy ? `${(metrics.avg_tool_accuracy * 100).toFixed(1)}%` : "89.0%"}
+          change="+5%"
+          positive
+        />
       </div>
 
       {/* Radar Chart */}
@@ -164,36 +225,45 @@ export default function ReliabilityPage() {
         </div>
       </div>
 
-      {/* Failure Analysis Table */}
+      {/* Alerts Table */}
       <div className="border border-border rounded-lg overflow-hidden">
-        <div className="px-4 py-3 bg-muted font-medium text-sm">Recent Failure Analysis</div>
+        <div className="px-4 py-3 bg-muted font-medium text-sm">Recent Alerts</div>
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
-              <th className="text-left p-3 font-medium">Trace ID</th>
-              <th className="text-left p-3 font-medium">Failure Type</th>
-              <th className="text-left p-3 font-medium">Root Cause</th>
+              <th className="text-left p-3 font-medium">Alert ID</th>
+              <th className="text-left p-3 font-medium">Type</th>
               <th className="text-left p-3 font-medium">Severity</th>
-              <th className="text-left p-3 font-medium">Model</th>
+              <th className="text-left p-3 font-medium">Message</th>
+              <th className="text-left p-3 font-medium">Trace</th>
+              <th className="text-left p-3 font-medium">Status</th>
             </tr>
           </thead>
           <tbody>
-            {[
-              { id: "t-3921", type: "Hallucination", cause: "Unsupported claim in citation", severity: "P1", model: "Qwen3-32B" },
-              { id: "t-3920", type: "Tool Error", cause: "Invalid parameter schema", severity: "P2", model: "Ministral-8B" },
-              { id: "t-3918", type: "Loop Collapse", cause: "Reflection oscillation", severity: "P0", model: "DeepSeek-R1" },
-              { id: "t-3915", type: "Memory Poison", cause: "Stale context retrieval", severity: "P1", model: "Llama4-Mav" },
-            ].map((row) => (
-              <tr key={row.id} className="border-t border-border hover:bg-muted/30">
-                <td className="p-3 font-mono text-xs">{row.id}</td>
-                <td className="p-3">{row.type}</td>
-                <td className="p-3 text-muted-foreground">{row.cause}</td>
-                <td className="p-3">
-                  <SeverityBadge severity={row.severity} />
+            {alerts.length > 0 ? (
+              alerts.map((alert) => (
+                <tr key={alert.alert_id} className="border-t border-border hover:bg-muted/30">
+                  <td className="p-3 font-mono text-xs">{alert.alert_id}</td>
+                  <td className="p-3">{alert.alert_type}</td>
+                  <td className="p-3">
+                    <SeverityBadge severity={alert.severity} />
+                  </td>
+                  <td className="p-3 text-muted-foreground">{alert.message}</td>
+                  <td className="p-3 font-mono text-xs">{alert.trace_id}</td>
+                  <td className="p-3">
+                    <span className={`text-xs ${alert.acknowledged ? "text-green-400" : "text-yellow-400"}`}>
+                      {alert.acknowledged ? "Acknowledged" : "Open"}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="p-6 text-center text-muted-foreground">
+                  No alerts found
                 </td>
-                <td className="p-3">{row.model}</td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

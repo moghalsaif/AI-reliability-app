@@ -166,9 +166,9 @@ class ClickHouseClient:
         """Initialize ClickHouse connection."""
         try:
             import aiochclient
+            url = f"http://{self.host}:{self.port}"
             self._client = aiochclient.ChClient(
-                host=self.host,
-                port=self.port,
+                url=url,
                 database=self.database,
                 user=self.username,
                 password=self.password,
@@ -196,14 +196,29 @@ class ClickHouseClient:
         for schema in schemas:
             await self.execute(schema)
     
-    async def execute(self, query: str, params: Optional[Dict] = None) -> Any:
+    async def execute(self, query: str, *args) -> Any:
         """Execute a query."""
         if self._client is None:
             await self.connect()
         
-        if hasattr(self._client, "execute"):
-            return self._client.execute(query, params)
-        return None
+        import inspect
+        is_async = inspect.iscoroutinefunction(self._client.execute)
+        
+        if is_async:
+            # aiochclient
+            query_stripped = query.strip().upper()
+            if query_stripped.startswith("SELECT") or query_stripped.startswith("SHOW"):
+                result = await self._client.fetch(query, *args)
+                # Convert Record objects to dicts
+                return [dict(row) for row in result] if result else []
+            if args:
+                return await self._client.execute(query, *args)
+            return await self._client.execute(query)
+        else:
+            # clickhouse-connect sync client
+            if args:
+                return self._client.execute(query, *args)
+            return self._client.execute(query)
     
     async def insert_trace(self, trace: Trace) -> None:
         """Insert a trace into ClickHouse."""
@@ -247,7 +262,7 @@ class ClickHouseClient:
             json.dumps(trace.attributes),
         )]
         
-        await self.execute(query, {"values": values})
+        await self.execute(query, *values)
         
         # Insert spans
         if trace.root_span:
@@ -298,7 +313,7 @@ class ClickHouseClient:
             span.tags,
         )]
         
-        await self.execute(query, {"values": values})
+        await self.execute(query, *values)
         
         for child in span.children:
             await self._insert_spans_recursive(trace_id, child)

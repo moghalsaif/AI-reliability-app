@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -9,10 +9,9 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   Legend,
 } from "recharts";
+import { api, Trace } from "@/lib/api";
 
 interface Benchmark {
   id: string;
@@ -26,7 +25,7 @@ interface Benchmark {
   last_run: string;
 }
 
-const benchmarks: Benchmark[] = [
+const defaultBenchmarks: Benchmark[] = [
   {
     id: "rag-001",
     name: "RAG Adversarial",
@@ -94,6 +93,25 @@ const categoryScores = [
 
 export default function BenchmarksPage() {
   const [selectedBenchmark, setSelectedBenchmark] = useState<Benchmark | null>(null);
+  const [traces, setTraces] = useState<Trace[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getTraces(50)
+      .then((data) => {
+        setTraces(data.traces || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  // Derive benchmark stats from real trace evaluations if available
+  const tracesByCategory = traces.reduce((acc, trace) => {
+    const cat = trace.agent_name || "unknown";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(trace);
+    return acc;
+  }, {} as Record<string, Trace[]>);
 
   return (
     <div className="space-y-8">
@@ -102,6 +120,11 @@ export default function BenchmarksPage() {
         <p className="text-muted-foreground">
           Adversarial datasets, stress tests, and regression benchmarks.
         </p>
+        {traces.length > 0 && (
+          <p className="text-sm text-green-400 mt-1">
+            {traces.length} traces loaded from API
+          </p>
+        )}
       </div>
 
       {/* Category Performance */}
@@ -144,7 +167,7 @@ export default function BenchmarksPage() {
             </tr>
           </thead>
           <tbody>
-            {benchmarks.map((bm) => (
+            {defaultBenchmarks.map((bm) => (
               <tr key={bm.id} className="border-t border-border hover:bg-muted/30">
                 <td className="p-3 font-medium">{bm.name}</td>
                 <td className="p-3">

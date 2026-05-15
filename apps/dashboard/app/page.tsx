@@ -13,43 +13,96 @@ import {
   Bar,
   Legend,
 } from "recharts";
-
-interface Trace {
-  trace_id: string;
-  name: string;
-  agent_name: string;
-  start_time: string;
-  success: boolean;
-  total_latency_ms: number;
-  span_count: number;
-}
+import { api, Trace } from "@/lib/api";
 
 export default function TracesPage() {
   const [traces, setTraces] = useState<Trace[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
 
   useEffect(() => {
-    // Mock data for demonstration
-    const mockTraces: Trace[] = Array.from({ length: 20 }, (_, i) => ({
-      trace_id: `trace-${i}`,
-      name: `contract_agent_${i}`,
-      agent_name: "contract_agent",
-      start_time: new Date(Date.now() - i * 60000).toISOString(),
-      success: Math.random() > 0.15,
-      total_latency_ms: Math.random() * 5000 + 500,
-      span_count: Math.floor(Math.random() * 10) + 3,
-    }));
-    setTraces(mockTraces);
-    setLoading(false);
+    api
+      .getTraces(100)
+      .then((data) => {
+        setTraces(data.traces || []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch traces:", err);
+        // Fallback to mock data if API unavailable
+        const mockTraces: Trace[] = Array.from({ length: 20 }, (_, i) => ({
+          trace_id: `trace-${i}`,
+          name: `contract_agent_${i}`,
+          agent_name: "contract_agent",
+          start_time: new Date(Date.now() - i * 60000).toISOString(),
+          success: Math.random() > 0.15,
+          total_latency_ms: Math.random() * 5000 + 500,
+          span_count: Math.floor(Math.random() * 10) + 3,
+          status: Math.random() > 0.15 ? "success" : "error",
+        }));
+        setTraces(mockTraces);
+        setError("API unavailable — showing demo data");
+        setLoading(false);
+      });
   }, []);
 
-  const successRate = traces.length > 0
-    ? (traces.filter((t) => t.success).length / traces.length) * 100
-    : 0;
+  // WebSocket for real-time updates
+  useEffect(() => {
+    const wsUrl = process.env.NEXT_PUBLIC_API_URL
+      ? process.env.NEXT_PUBLIC_API_URL.replace("http", "ws") + "/v1/ws/traces"
+      : "ws://localhost:8000/v1/ws/traces";
+    
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onopen = () => {
+      setWsConnected(true);
+      console.log("WebSocket connected");
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === "trace_update") {
+          setTraces((prev) => [message.data as Trace, ...prev.slice(0, 99)]);
+        }
+      } catch (err) {
+        console.error("WebSocket message error:", err);
+      }
+    };
+    
+    ws.onclose = () => {
+      setWsConnected(false);
+      console.log("WebSocket disconnected");
+    };
+    
+    ws.onerror = (err) => {
+      console.error("WebSocket error:", err);
+      setWsConnected(false);
+    };
+    
+    // Keepalive ping
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send("ping");
+      }
+    }, 30000);
+    
+    return () => {
+      clearInterval(pingInterval);
+      ws.close();
+    };
+  }, []);
 
-  const avgLatency = traces.length > 0
-    ? traces.reduce((sum, t) => sum + t.total_latency_ms, 0) / traces.length
-    : 0;
+  const successRate =
+    traces.length > 0
+      ? (traces.filter((t) => t.success).length / traces.length) * 100
+      : 0;
+
+  const avgLatency =
+    traces.length > 0
+      ? traces.reduce((sum, t) => sum + t.total_latency_ms, 0) / traces.length
+      : 0;
 
   const chartData = traces.map((t) => ({
     time: new Date(t.start_time).toLocaleTimeString(),
@@ -58,6 +111,14 @@ export default function TracesPage() {
     success: t.success ? 1 : 0,
   }));
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">Loading traces...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -65,20 +126,33 @@ export default function TracesPage() {
         <p className="text-muted-foreground">
           Monitor agent traces, spans, and failures in real-time.
         </p>
+      {error && (
+        <div className="mt-2 text-sm text-yellow-400 bg-yellow-400/10 px-3 py-2 rounded">
+          {error}
+        </div>
+      )}
+      <div className="flex items-center gap-2 text-sm">
+        <span
+          className={`w-2 h-2 rounded-full ${
+            wsConnected ? "bg-green-400 animate-pulse" : "bg-gray-400"
+          }`}
+        />
+        <span className="text-muted-foreground">
+          {wsConnected ? "Live updates" : "Offline"}
+        </span>
+      </div>
       </div>
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-4 gap-4">
-        <MetricCard
-          title="Total Traces"
-          value={traces.length}
-          icon="📊"
-        />
+        <MetricCard title="Total Traces" value={traces.length} icon="📊" />
         <MetricCard
           title="Success Rate"
           value={`${successRate.toFixed(1)}%`}
           icon="✓"
-          trend={successRate > 90 ? "good" : successRate > 70 ? "warning" : "bad"}
+          trend={
+            successRate > 90 ? "good" : successRate > 70 ? "warning" : "bad"
+          }
         />
         <MetricCard
           title="Avg Latency"
@@ -89,7 +163,9 @@ export default function TracesPage() {
           title="Active Alerts"
           value={traces.filter((t) => !t.success).length}
           icon="🚨"
-          trend={traces.filter((t) => !t.success).length > 3 ? "bad" : "good"}
+          trend={
+            traces.filter((t) => !t.success).length > 3 ? "bad" : "good"
+          }
         />
       </div>
 
@@ -103,7 +179,10 @@ export default function TracesPage() {
               <XAxis dataKey="time" stroke="#666" fontSize={12} />
               <YAxis stroke="#666" fontSize={12} />
               <Tooltip
-                contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid #333" }}
+                contentStyle={{
+                  backgroundColor: "#1a1a1a",
+                  border: "1px solid #333",
+                }}
               />
               <Line
                 type="monotone"
@@ -124,7 +203,10 @@ export default function TracesPage() {
               <XAxis dataKey="time" stroke="#666" fontSize={12} />
               <YAxis stroke="#666" fontSize={12} />
               <Tooltip
-                contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid #333" }}
+                contentStyle={{
+                  backgroundColor: "#1a1a1a",
+                  border: "1px solid #333",
+                }}
               />
               <Bar dataKey="spans" fill="#82ca9d" />
             </BarChart>
@@ -147,9 +229,12 @@ export default function TracesPage() {
           </thead>
           <tbody>
             {traces.map((trace) => (
-              <tr key={trace.trace_id} className="border-t border-border hover:bg-muted/50">
+              <tr
+                key={trace.trace_id}
+                className="border-t border-border hover:bg-muted/50"
+              >
                 <td className="p-3 font-mono text-xs">{trace.trace_id}</td>
-                <td className="p-3">{trace.agent_name}</td>
+                <td className="p-3">{trace.agent_name || "unknown"}</td>
                 <td className="p-3">
                   <span
                     className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -161,8 +246,10 @@ export default function TracesPage() {
                     {trace.success ? "Success" : "Failed"}
                   </span>
                 </td>
-                <td className="p-3">{(trace.total_latency_ms / 1000).toFixed(2)}s</td>
-                <td className="p-3">{trace.span_count}</td>
+                <td className="p-3">
+                  {(trace.total_latency_ms / 1000).toFixed(2)}s
+                </td>
+                <td className="p-3">{trace.span_count || 0}</td>
                 <td className="p-3 text-muted-foreground">
                   {new Date(trace.start_time).toLocaleTimeString()}
                 </td>

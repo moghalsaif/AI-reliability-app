@@ -12,7 +12,7 @@ services:
     environment:
       CLICKHOUSE_DB: reliability_lab
       CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_PASSWORD: "reliability_lab_pass"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
       interval: 30s
@@ -70,6 +70,8 @@ services:
       - CLICKHOUSE_HOST=clickhouse
       - CLICKHOUSE_PORT=8123
       - CLICKHOUSE_DATABASE=reliability_lab
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=reliability_lab_pass
       - REDIS_URL=redis://redis:6379/0
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
     depends_on:
@@ -92,11 +94,13 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CLICKHOUSE_HOST=clickhouse
       - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=reliability_lab_pass
     depends_on:
       - redis
       - clickhouse
     volumes:
-      - ../apps/worker/src:/app/src
+      - ../worker/src:/app/src
     command: celery -A worker worker --loglevel=info
 
   # Evaluator - Evaluation worker
@@ -108,6 +112,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CLICKHOUSE_HOST=clickhouse
       - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=reliability_lab_pass
       - OLLAMA_HOST=http://ollama:11434
     depends_on:
       - redis

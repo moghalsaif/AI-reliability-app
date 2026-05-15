@@ -36,6 +36,8 @@ class ReliabilityConfig:
     clickhouse_host: str = "localhost"
     clickhouse_port: int = 8123
     clickhouse_database: str = "reliability_lab"
+    clickhouse_username: str = "default"
+    clickhouse_password: str = ""
     
     # Redis
     redis_url: str = "redis://localhost:6379/0"
@@ -62,6 +64,8 @@ class ReliabilityConfig:
             clickhouse_host=os.getenv("CLICKHOUSE_HOST", cls.clickhouse_host),
             clickhouse_port=int(os.getenv("CLICKHOUSE_PORT", cls.clickhouse_port)),
             clickhouse_database=os.getenv("CLICKHOUSE_DATABASE", cls.clickhouse_database),
+            clickhouse_username=os.getenv("CLICKHOUSE_USER", cls.clickhouse_username),
+            clickhouse_password=os.getenv("CLICKHOUSE_PASSWORD", cls.clickhouse_password),
             redis_url=os.getenv("REDIS_URL", cls.redis_url),
             enable_evaluations=os.getenv("RELIABILITY_ENABLE_EVALS", "true").lower() == "true",
             enable_reliability_analysis=os.getenv("RELIABILITY_ENABLE_RELIABILITY", "true").lower() == "true",
