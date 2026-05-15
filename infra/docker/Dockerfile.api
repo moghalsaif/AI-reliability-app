@@ -1,0 +1,27 @@
+# API Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy packages
+COPY packages/shared /packages/shared
+COPY packages/sdk /packages/sdk
+COPY packages/evals /packages/evals
+COPY packages/reliability /packages/reliability
+COPY apps/api /app
+
+# Install packages in order
+RUN pip install --no-cache-dir -e /packages/shared && \
+    pip install --no-cache-dir -e /packages/sdk && \
+    pip install --no-cache-dir -e /packages/evals && \
+    pip install --no-cache-dir -e /packages/reliability && \
+    pip install --no-cache-dir -e /app
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

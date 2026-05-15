@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "reliability-worker"
+version = "0.1.0"
+description = "AI Reliability Lab - Celery Worker"
+requires-python = ">=3.10"
+dependencies = [
+    "celery>=5.3.0",
+    "redis>=5.0.0",
+    "reliability-shared",
+    "reliability-sdk",
+    "reliability-evals",
+    "reliability-engine",
+    "reliability-api",
+]
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/reliability_worker"]

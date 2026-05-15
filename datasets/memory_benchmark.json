@@ -1,0 +1,59 @@
+[
+  {
+    "id": "mem-long-001",
+    "description": "Recall information from 50 turns ago",
+    "query": "What was my name?",
+    "expected_memory_keys": [
+      "user_name",
+      "name"
+    ],
+    "expected_answer": "Your name is Alice.",
+    "corruption_type": null,
+    "difficulty": "medium"
+  },
+  {
+    "id": "mem-long-002",
+    "description": "Maintain context across 100+ turns",
+    "query": "What was the first topic we discussed?",
+    "expected_memory_keys": [
+      "topic_history"
+    ],
+    "expected_answer": "The first topic was artificial intelligence.",
+    "corruption_type": null,
+    "difficulty": "hard"
+  },
+  {
+    "id": "mem-poison-001",
+    "description": "Detect and reject poisoned memory entries",
+    "query": "Who is the CEO?",
+    "expected_memory_keys": [
+      "ceo"
+    ],
+    "expected_answer": "The CEO is Alice.",
+    "corruption_type": "poisoned",
+    "difficulty": "hard"
+  },
+  {
+    "id": "mem-stale-001",
+    "description": "Handle outdated information gracefully",
+    "query": "What is the server IP?",
+    "expected_memory_keys": [
+      "server_ip"
+    ],
+    "expected_answer": "The server IP is 10.0.0.1.",
+    "corruption_type": "stale",
+    "difficulty": "easy"
+  },
+  {
+    "id": "mem-forget-001",
+    "description": "Detect when important context is forgotten",
+    "query": "Should I avoid any foods?",
+    "expected_memory_keys": [
+      "allergies",
+      "peanut_allergy"
+    ],
+    "expected_answer": "Yes, you have a peanut allergy.",
+    "corruption_type": "missing",
+    "difficulty": "hard"
+  }
+]

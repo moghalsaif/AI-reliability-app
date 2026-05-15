@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "reliability-sdk"
+version = "0.1.0"
+description = "AI Reliability Lab - SDK for instrumenting AI agents"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "AI Reliability Lab"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "reliability-shared",
+    "requests>=2.31.0",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+]
+
+[project.optional-dependencies]
+langgraph = ["langgraph>=0.0.20"]
+litellm = ["litellm>=1.0.0"]
+openai = ["openai>=1.0.0"]
+ollama = ["ollama>=0.1.0"]
+crewai = ["crewai>=0.1.0"]
+autogen = ["pyautogen>=0.2.0"]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "black>=23.0",
+    "mypy>=1.0",
+]
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/reliability_sdk"]

@@ -1,0 +1,129 @@
+[
+  {
+    "id": "tool-sel-001",
+    "description": "Select weather tool for weather query",
+    "context": "What's the temperature in Tokyo?",
+    "expected_tool": "weather_api",
+    "expected_parameters": {
+      "location": "Tokyo",
+      "metric": "temperature"
+    },
+    "inject_errors": null,
+    "expected_recovery": null,
+    "difficulty": "easy"
+  },
+  {
+    "id": "tool-sel-002",
+    "description": "Ambiguous query requires reasoning",
+    "context": "I need to know about something in the sky that's bright today",
+    "expected_tool": "weather_api",
+    "expected_parameters": {
+      "query": "sky brightness"
+    },
+    "inject_errors": null,
+    "expected_recovery": null,
+    "difficulty": "medium"
+  },
+  {
+    "id": "tool-sel-003",
+    "description": "Multi-tool plan required",
+    "context": "Book me a flight to NYC and find a hotel",
+    "expected_tool": "flight_search",
+    "expected_parameters": {
+      "destination": "NYC"
+    },
+    "inject_errors": null,
+    "expected_recovery": null,
+    "difficulty": "hard"
+  },
+  {
+    "id": "tool-param-001",
+    "description": "Valid parameters for calculator",
+    "context": "Calculate compound interest on $1000 at 5% for 10 years",
+    "expected_tool": "calculator",
+    "expected_parameters": {
+      "principal": 1000,
+      "rate": 0.05,
+      "years": 10,
+      "operation": "compound_interest"
+    },
+    "inject_errors": null,
+    "expected_recovery": null,
+    "difficulty": "medium"
+  },
+  {
+    "id": "tool-param-002",
+    "description": "Handle missing required parameter",
+    "context": "Search for restaurants",
+    "expected_tool": "restaurant_search",
+    "expected_parameters": {
+      "location": "current",
+      "cuisine": null
+    },
+    "inject_errors": [
+      "missing_param"
+    ],
+    "expected_recovery": "ask_for_location",
+    "difficulty": "medium"
+  },
+  {
+    "id": "tool-recovery-001",
+    "description": "Timeout recovery with retry",
+    "context": "Get stock price for AAPL",
+    "expected_tool": "stock_api",
+    "expected_parameters": {
+      "symbol": "AAPL"
+    },
+    "inject_errors": [
+      "timeout"
+    ],
+    "expected_recovery": "retry_with_backoff",
+    "difficulty": "medium"
+  },
+  {
+    "id": "tool-recovery-002",
+    "description": "Rate limit with fallback",
+    "context": "Translate 'hello' to French",
+    "expected_tool": "google_translate",
+    "expected_parameters": {
+      "text": "hello",
+      "target": "fr"
+    },
+    "inject_errors": [
+      "rate_limit"
+    ],
+    "expected_recovery": "switch_to_deepl",
+    "difficulty": "hard"
+  },
+  {
+    "id": "tool-recovery-003",
+    "description": "Invalid schema with correction",
+    "context": "Search for articles about AI",
+    "expected_tool": "article_search",
+    "expected_parameters": {
+      "query": "AI",
+      "date_range": "2024"
+    },
+    "inject_errors": [
+      "invalid_schema"
+    ],
+    "expected_recovery": "fix_schema_and_retry",
+    "difficulty": "hard"
+  },
+  {
+    "id": "tool-retry-001",
+    "description": "Excessive retries detection",
+    "context": "Get weather",
+    "expected_tool": "weather_api",
+    "expected_parameters": {},
+    "inject_errors": [
+      "timeout",
+      "timeout",
+      "timeout",
+      "timeout",
+      "timeout"
+    ],
+    "expected_recovery": "fail_gracefully",
+    "difficulty": "hard"
+  }
+]
